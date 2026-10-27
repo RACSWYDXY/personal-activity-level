@@ -1,0 +1,18 @@
+{
+  "name": "PAL · Personal Activity Level",
+  "short_name": "PAL",
+  "description": "轻量自托管个人活跃度与奖励中心",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f8fd",
+  "theme_color": "#f6f7fc",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

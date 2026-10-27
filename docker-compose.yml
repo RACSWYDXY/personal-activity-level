@@ -1,0 +1,23 @@
+# Preserve the legacy Compose project and Docker volume names for existing fnOS installs.
+name: questflow
+services:
+  questflow:
+    build:
+      context: .
+      args:
+        PYTHON_IMAGE: "${PYTHON_IMAGE:-python:3.12-alpine}"
+        ALPINE_MIRROR: "${ALPINE_MIRROR:-}"
+    container_name: questflow
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8765}:8765"
+    environment:
+      APP_SETUP_KEY: "${APP_SETUP_KEY:?Configure APP_SETUP_KEY in .env}"
+      TZ: "${TZ:-Asia/Shanghai}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-0}"
+    volumes:
+      - questflow_data:/data
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  questflow_data:
