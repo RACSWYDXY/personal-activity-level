@@ -78,6 +78,39 @@ sudo docker compose down           # 停止和移除容器，默认保留命名�
 
 **禁止误用 `down -v`**：它将删除命名数据卷，导致丢失所有数据。迁移旧 QuestFlow 到 PAL 前，请先按 `DATABASE.md` 备份。
 
+恢复数据库请按 [DATABASE.md 的恢复流程](DATABASE.md#restore-advanced-and-destructive-if-used-incorrectly) 操作：验证备份、确认实际卷名、停止服务并归档旧卷、恢复及清理旧 WAL/SHM，最后重启核对。**日常恢复不要使用 `docker compose down -v`。**
+
+## 宿主机端口迁移
+
+例如将宿主机端口从 `8765` 改为 `8877`，容器内部仍使用 `8765`，数据卷不变。先完成在线备份；在原项目目录、同一个 Bash 终端执行（目录及容器名按旧部署调整；有 Docker 权限时可去掉函数中的 `sudo`）：
+
+```bash
+set -eu
+cd /vol1/1000/questflow
+CONTAINER='questflow'
+d() { sudo docker "$@"; }
+PROJECT=$(d inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "$CONTAINER")
+test -n "$PROJECT" && test "$PROJECT" != '<no value>'
+dc() { d compose -p "$PROJECT" "$@"; }
+test "$(dc ps -aq questflow)" = "$(d inspect -f '{{.Id}}' "$CONTAINER")"
+OLD_MOUNT=$(d inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Type}}:{{.Source}}{{end}}{{end}}' "$CONTAINER")
+test -n "$OLD_MOUNT"
+```
+
+编辑原 `.env` 中的 `HOST_PORT` 为 `HOST_PORT=8877`（没有则添加，仅保留一项），先确认新端口未被其他服务占用。保留原 Compose/override 文件及项目名，不要重命名卷。然后执行：
+
+```bash
+unset HOST_PORT  # 避免当前 shell 中的旧值覆盖 .env
+dc config --quiet
+dc up -d --no-build --force-recreate questflow
+test "$(d inspect -f '{{range .Mounts}}{{if eq .Destination "/data"}}{{.Type}}:{{.Source}}{{end}}{{end}}' "$CONTAINER")" = "$OLD_MOUNT"
+dc port questflow 8765
+dc ps
+dc logs --tail=100 questflow
+```
+
+端口输出应包含 `8877`。若挂载检查失败，立即 `dc stop questflow` 并核对原配置。浏览器访问 `http://<fnOS的LAN_IP>:8877`，重新登录并确认原有数据；相应更新书签、局域网防火墙或反向代理。若端口冲突，改回 `.env` 原值后重复重建命令即可；不需要删除数据卷或重新构建镜像。
+
 ## 远程访问
 
 不建议将 NAS 的 `8765/TCP` 端口直接开放到公网。使用 Tailscale/WireGuard 等 VPN；如使用 HTTPS 反向代理，请正确处理 TLS、可信反代和 `COOKIE_SECURE=1`。HTTPS 之外的普通 HTTP 不应设置 Secure Cookie 为 1，否则浏览器不会正常携带登录 Cookie。
